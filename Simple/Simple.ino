@@ -20,15 +20,31 @@
 #define LED_GREEN 2
 #define LED_BLUE 1
 
-
+// temp to turn off fan
 #define TEMP_OFF (25<<2)
+
+// temp to start the fan
 #define TEMP_START (28<<2)
-#define FAN_SCALE 3
-#define FAN_MIN 32
+
+// bitshift amount to scale fan speed with temp
+#define FAN_SCALE 2
+
+// minimum PWM value
+#define FAN_MIN 16
+
+// resolution of temp sensor
 #define TEMP_BITS 10
 
 #define PWM_SHIFT 3
 #define PWM_MASK 0x1f
+
+// these will need to be defined based on output pin. These are writing to port B output 0, which is pin 5 on the ATTiny85
+#define FAN_ON PORTB |= 0x01
+#define FAN_OFF PORTB &= ~0x01
+
+// how often to check temperature. When the task counter masked with this hits zero, the temperature will be checked. 0x0fff is about 1 sec period.
+#define TASK_COUNTER_MASK 0x3fff
+
 
 // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 OneWire oneWire(ONE_WIRE_BUS);
@@ -42,7 +58,6 @@ int16_t millis_to_wait = 750;
 unsigned long temperature_read_time_ms = 0;
 byte pwm_counter = 0;
 unsigned int task_counter = 0;
-#define TASK_COUNTER_MASK 0x0fff
 
 void led(byte r, byte g, byte b){
   digitalWrite(LED_RED,1-r);
@@ -105,6 +120,13 @@ void setFanSpeed(byte newspeed)
   else if (newspeed<=64) led(0,1,0);
   else if (newspeed<=128) led(1,1,0);
   else led(1,0,0);
+
+  // give a stopped fan a kick-start
+  if (newspeed && !current){
+      FAN_ON;
+      delay(500);
+      FAN_OFF;
+  }
   
   current = newspeed >> PWM_SHIFT;
 }
@@ -136,12 +158,12 @@ void loop(void)
   
   if (current && pwm_counter_masked == 0)
   {
-      PORTB |= 0x01;
+      FAN_ON;
   }
 
   if (pwm_counter_masked == current)
   {
-      PORTB &= ~0x01;
+      FAN_OFF;
   }
 
   if (!pwm_counter)
