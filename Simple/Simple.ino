@@ -30,7 +30,7 @@
 #define FAN_SCALE 2
 
 // minimum PWM value
-#define FAN_MIN 16
+#define FAN_MIN 64
 
 // resolution of temp sensor
 #define TEMP_BITS 10
@@ -121,6 +121,7 @@ void setFanSpeed(byte newspeed)
   else if (newspeed<=128) led(1,1,0);
   else led(1,0,0);
 
+  newspeed >>= PWM_SHIFT;
   // give a stopped fan a kick-start
   if (newspeed && !current){
       FAN_ON;
@@ -128,7 +129,7 @@ void setFanSpeed(byte newspeed)
       FAN_OFF;
   }
   
-  current = newspeed >> PWM_SHIFT;
+  current = newspeed;
 }
 
 
@@ -155,15 +156,17 @@ void loop(void)
 {   
   // process pwm
   byte pwm_counter_masked = pwm_counter & PWM_MASK;
-  
-  if (current && pwm_counter_masked == 0)
-  {
-      FAN_ON;
-  }
 
+  // if our pwm counter has reached our fan setting, then turn off
   if (pwm_counter_masked == current)
   {
       FAN_OFF;
+  }
+
+  // if our current fan speed value is not zero, and we're at the start of our pwm cycle, then turn on
+  if (current && pwm_counter_masked == 0)
+  {
+      FAN_ON;
   }
 
   if (!pwm_counter)
